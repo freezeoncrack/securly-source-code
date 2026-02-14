@@ -3,6 +3,7 @@ contains every extension source code from the securly extensions that I know of 
 
 ## useful URLs
 https://cdn1.securly.com/pmatch.json  (Update: Just noticed that this is encrypted and i cant crack it, i was able to see it on my chromebook so i will have to extract it from there and upload a backup copy)
+
 https://cdn1.securly.com/config.json  
 https://crextnaut.securly.com/ (idk, that’s a source URL for the manifest)
 
