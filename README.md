@@ -1,3 +1,6 @@
+# retards
+pmatch was cracked with a raw HTTP response, base64-decoded it with OpenSSL’s single-line mode, then decrypted the AES-CBC payload with the passphrase SeCuRlY@321$ yall really fucking used SeCuRlY@321$ as a passphrase, yall need some help cuz these schools need to leave your platform. Praise the lord and get this shitty unscure spyware out of our schools. I wonder what else in the securly ecosystem uses that passprase, ig ima have to brute force your whole platform
+
 # source
 contains every extension source code from the securly extensions that I know of (anything in my school’s update manifest) | I made this so people can reverse engineer this and find some concerns about privacy in it so we can take this shit spyware out of our schools. I have no time to look through the source, so I’m hoping others can look through it.
 
