@@ -1,0 +1,356 @@
+function getChromeTabs(tabOptions) {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.query(tabOptions, function (tabs) {
+      if (chrome.runtime.lastError) {
+        console.log("Cannot get chrome tabs: " + chrome.runtime.lastError.message);
+      }
+      resolve(tabs);
+    });
+  });
+}
+
+function getWindows() {
+  return new Promise((resolve) => {
+    chrome.windows.getAll({populate: true}, windows => {
+      resolve(windows);
+    });
+  });
+}
+
+async function getWindow(windowId) {
+  return new Promise((resolve, reject) => {
+    chrome.windows.get(windowId, window => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError.message);
+      } else {
+        resolve(window);
+      }
+    })
+  });
+}
+
+function getFocusedWindow() {
+  return new Promise((resolve) => {
+    chrome.windows.getLastFocused(null, function(window) {
+      resolve(window);
+    });
+  });
+}
+
+function createWindow(urls) {
+  return new Promise((resolve) => {
+    const data = {focused: true, state: "normal", type: "normal"};
+    if (urls) {
+      data["url"] = urls;
+      if (config.maxOpenTabs > 0 && urls.length > config.maxOpenTabs) {
+        config.additionalOpenTabs = urls.length - config.maxOpenTabs;
+      }
+    }
+    chrome.windows.create(data,window => {
+      resolve(window);
+    });
+  })
+}
+
+async function updateWindowFullscreen(windowId) {
+  const updateInfo = {focused: true, state: "fullscreen"};
+  try {
+    await updateWindow(windowId, updateInfo);
+  } catch (error) {
+    console.log("Error while update to fullscreen: " + chrome.runtime.lastError.message);
+  }
+}
+
+async function updateWindow(windowId, updateInfo) {
+  return new Promise((resolve, reject) => {
+    chrome.windows.update(windowId, updateInfo, function(window) {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError.message);
+      } else {
+        resolve();
+      }
+    });
+  });
+}
+
+async function getTab(tabId) {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.get(tabId, function (tab) {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError.message);
+      }
+      resolve(tab);
+    });
+  });
+}
+
+function openNewTab(createProperties) {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.create(createProperties, function (tab) {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError.message);
+      } else {
+        resolve(tab);
+      }
+    });
+  });
+}
+
+async function closeTab(tabId) {
+  try {
+    await chrome.tabs.remove(tabId);
+  } catch (error) {
+    console.log("Error closing tab: " + error);
+  }
+}
+
+async function focusTab(tabId) {
+  const tab = await getTab(tabId);
+  if (tab) {
+    try {
+      const window = await getWindow(tab.windowId);
+      await updateWindow(window.id, { focused: true });
+      await updateTab(tabId, { active: true });
+    } catch (error) {
+      console.log("Error focusing tab: " + error);
+    }
+  } else {
+    console.log("Not found tab with id=" + tabId);
+  }
+}
+
+function captureVisibleTab() {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.captureVisibleTab(function (screenshotUrl) {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError.message);
+      }
+      if (typeof screenshotUrl === "undefined") {
+        reject("No screenshot captured")
+      }
+      // let base64string = screenshotUrl.split(',')[1];
+      resolve(screenshotUrl);
+    });
+  });
+}
+
+async function getConfig() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(null, function (items) {
+      if (chrome.runtime.lastError) {
+        console.log("Error loading config from storage: " + chrome.runtime.lastError.message);
+        resolve(new Config({}))
+      }
+      resolve(new Config(items))
+    })
+  })
+}
+
+async function getStoredUrls() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(STORAGE_URLS, (result) => {
+      if (chrome.runtime.lastError) {
+        console.log("Failed to load urls from local storage");
+        resolve();
+      } else {
+        resolve(result[STORAGE_URLS]);
+      }
+    })
+  })
+}
+
+async function getEmail() {
+  if (typeof getSubstitutedEmail === "function") {
+    return Promise.resolve(getSubstitutedEmail());
+  }
+  if (IS_EXTENSION && chrome.identity) {
+    return new Promise(resolve => {
+      const prepare = function (email) {
+        return email && email.trim().length > 0 ? email : null;
+      }
+      if (chrome.declarativeNetRequest) { //check that version is 84+
+        chrome.identity.getProfileUserInfo({accountStatus:"ANY"}, function (userInfo) {
+            resolve(prepare(userInfo["email"]));
+        })
+      } else {
+        chrome.identity.getProfileUserInfo(function (userInfo) {
+          resolve(prepare(userInfo["email"]));
+        })
+      }
+    });
+  } else {
+    return Promise.resolve(null)
+  }
+}
+
+async function getDirectoryDeviceId() {
+  return new Promise((resolve, reject) => {
+    if (chrome.enterprise && chrome.enterprise.deviceAttributes) {
+      chrome.enterprise.deviceAttributes.getDirectoryDeviceId(function (deviceId) {
+        console.log("Start with requested directory device ID=" + deviceId);
+        resolve(deviceId);
+      });
+    } else {
+      resolve(null);
+    }
+  })
+}
+
+async function getSerialNumber() {
+  return new Promise((resolve, reject) => {
+    if (chrome.enterprise && chrome.enterprise.deviceAttributes) {
+      chrome.enterprise.deviceAttributes.getDeviceSerialNumber(function (serial) {
+        resolve(serial);
+      });
+    } else {
+      resolve(null);
+    }
+  })
+}
+
+
+function clearAllAlarms() {
+  return new Promise((resolve) => {
+    chrome.alarms.clearAll(wasCleared => {
+     if (!wasCleared) {
+       console.log("Alarms not cleared");
+       if (chrome.runtime.lastError) {
+         console.log("Alarms clear error: " + chrome.runtime.lastError.message);
+       }
+     } else {
+       console.log("All alarms cleared");
+     }
+     resolve();
+    })
+  })
+}
+
+async function sendCommandToTab(tabId, command) {
+  try {
+    await sendMessageToTab(tabId, command);
+  } catch (error) {
+    const m = "Could not establish connection. Receiving end does not exist";
+    if (error.indexOf(m) !== -1) {
+      await injectScript(tabId);
+      await sendMessageToTab(tabId, command);
+    } else {
+      throw (error);
+    }
+  }
+}
+
+function sendMessageToTab(tabId, message) {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.sendMessage(tabId, message, async function (response) {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError.message);
+      } else {
+        resolve();
+      }
+    })
+  })
+}
+
+function injectScript(tabId) {
+  return new Promise((resolve, reject) => {
+    chrome.scripting.executeScript({target: {tabId: tabId, allFrames: false}, files: ["teacherTools.js"]},
+        function () {
+          if (chrome.runtime.lastError) {
+            console.log("Failed to inject scripts");
+            reject(chrome.runtime.lastError.message);
+          } else {
+            resolve();
+          }
+        });
+  })
+}
+
+function updateTab(tabId, properties) {
+  if (!(typeof tabId === "number")) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve, reject) => {
+    chrome.tabs.update(tabId, properties, function () {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError.message);
+      } else {
+        resolve();
+      }
+    });
+  })
+}
+
+function openLockWindow() {
+  return new Promise((resolve, reject) => {
+    const windowState = {
+      state: "fullscreen",
+      type:"popup",
+      focused: true,
+      url: "blocking/block.html"
+    };
+    chrome.windows.create(windowState,
+        function(window) {
+          if (chrome.runtime.lastError) {
+            reject(chrome.runtime.lastError.message);
+          } else {
+            resolve(window.id);
+          }
+        })
+  })
+}
+
+function removeLockWindow(windowId) {
+  return new Promise((resolve, reject) => {
+    chrome.windows.remove(windowId, function() {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError.message);
+      } else {
+        resolve();
+      }
+    });
+  });
+}
+
+async function getLocation() {
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition((position) => {
+          const coordinates = position.coords;
+          const location = {
+            'latitude': coordinates.latitude,
+            'longitude': coordinates.longitude,
+            'accuracy': coordinates.accuracy
+          };
+          console.log("Lat: " + coordinates.latitude.toFixed(4) +
+              " Lon: " + coordinates.longitude.toFixed(4));
+          resolve(location);
+        }, (error) => {
+          console.log("Error: " + error.code + ' ' + error.message);
+          const location = {
+            'error': error.message
+          };
+          resolve(location);
+        },
+        {
+          maximumAge: 600000,
+          timeout: 20000
+        });
+
+  });
+}
+
+async function getAlarm(name) {
+  return new Promise((resolve) => {
+    chrome.alarms.get(name, alarm => {
+      resolve(alarm);
+    });
+  });
+}
+
+async function clearAlarm(name) {
+  return new Promise((resolve) => {
+    chrome.alarms.clear(name, wasCleared => {
+      console.log("Alarm '" + name + (wasCleared ? "' was cleared" : "' was not cleared"));
+      resolve();
+    });
+  });
+}

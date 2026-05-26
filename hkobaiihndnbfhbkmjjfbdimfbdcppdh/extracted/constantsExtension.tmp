@@ -1,0 +1,7 @@
+const IS_KIOSK = false;
+const IS_EXTENSION = true;
+const NATIVE_HOST_NAME = "com.securly.classroom_native_host";
+const AGENT_HANDSHAKE = "handshake";
+const REASON_WINDOWS_NOT_ALLOWED = "win_not_allowed";
+const REASON_DEVICE_NOT_SUPPORTED = "device_not_supported";
+

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title>Test application blocking functionality</title>
+    <script type="text/javascript" src="js/lib/jquery-2.1.1.min.js"></script>
+    <script type="text/javascript" src="js/amd/settings.js"></script>
+    <script type="text/javascript" src="js/amd/extends.js"></script>
+    <script type="text/javascript" src="js/amd/clients/api.js"></script>
+    <script type="text/javascript" src="js/amd/clients/satellite.js"></script>
+    <script type="text/javascript" src="js/test/testAppBlock.js"></script>
+</head>
+<body>
+<h1>Connection state: <span>not ready</span></h1>
+<p id="help_text"></p>
+<form id="evil">
+    <fieldset>
+        <legend>Form to execute js</legend>
+        <input style="width: 75%" required name="eval_text">
+        <input type="submit">
+    </fieldset>
+</form>
+<br/>
+<form id="send_rule">
+    <fieldset>
+        <legend>Form to send rule</legend>
+        <select name="payload_type">
+            <option value="whitelist">Whitelist</option>
+            <option value="blacklist">Blacklist</option>
+        </select>
+        <br><br>
+        <label>Applications</label>
+        <textarea name="applications" style="width: 100%"></textarea>
+        <br><br>
+        <label>Hosts</label>
+        <textarea name="hosts" style="width: 100%"></textarea>
+        <br><br>
+        <input type="submit">
+    </fieldset>
+</form>
+</body>
+</html>

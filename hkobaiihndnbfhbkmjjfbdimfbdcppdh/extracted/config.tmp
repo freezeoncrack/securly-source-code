@@ -1,0 +1,356 @@
+/**
+ * Created by Stan on 01/03/17.
+ * Class responsible for configuration storage
+ */
+"use strict";
+class Config {
+  constructor(config) {
+    this.items = config;
+    this.items[STORAGE_BLOCKING_PLAN_TYPE] = "Allow_all";
+    delete this.items[STORAGE_BLOCKING_PLAN_URLS];
+    delete this.items[STORAGE_BLOCKING_PLAN_NAME];
+    delete this.items[STORAGE_BLOCKING_PLAN_ID];
+    delete this.items[STORAGE_WHITELIST];
+
+    this._defaultBlockMessage = "Your device is blocked";
+
+    this.directoryDeviceId = null;
+    this._pingCount = 0;
+    this.isLoggedIn = false;
+
+    this.announce = null;
+    this.sessionId = null;
+    this.activeClassNames = [];
+    this.studentId = null;
+    this.studentName = null;
+    this.canRaiseHand = false;
+    this.isHandRaised = false;
+    this.tabListenersAdded = false;
+    this.chatMessages = [];
+    this.hasUnreadChatMessages = false;
+    this.canStartChat = false;
+    this.playChatAlert = false;
+    this.closeTabsTimeout = null;
+    this.lockedToCourseWorkResources = false;
+    this.canvasAssignmentIds = [];
+    this.maxOpenTabs = 0;
+    this.additionalOpenTabs = 0;
+
+    this.smallScreenshotWidth = 0;
+    this.smallScreenshotHeight = 0;
+    this.bigScreenshotWidth = 0;
+    this.bigScreenshotHeight = 0;
+
+    this.activeTabId = null;
+
+    this.userEmail = null;
+    this.teacherId = null;
+    this.teacherName = null;
+
+    this.conferenceUrl = null;
+
+    this.blockWindowId = 0;
+
+    this.loginErrorReason = null;
+
+    this.shareScreenHandler = null;
+    this.capturedScreen = null;
+    this.rulesCount = 0;
+
+    if (!config[STORAGE_SERVER_URL]) {
+      this.items[STORAGE_SERVER_URL] = SERVER;
+    }
+    if (!config[STORAGE_SCREEN_BLOCK_MESSAGE]) {
+      this.items[STORAGE_SCREEN_BLOCK_MESSAGE] = this._defaultBlockMessage;
+    }
+    if (!config[STORAGE_BLOCKED_MODE_TYPE]) {
+      this.items[STORAGE_BLOCKED_MODE_TYPE] = IS_KIOSK ? PARAM_MODE_BLOCK : PARAM_MODE_NONE;
+    }
+    if (!config[STORAGE_NOTIFICATION_INTERVAL]) {
+      this.items[STORAGE_NOTIFICATION_INTERVAL] = 0;
+    }
+    if (!config[STORAGE_IS_SCREEN_CAPTURE_ALLOWED]) {
+      this.items[STORAGE_IS_SCREEN_CAPTURE_ALLOWED] = false;
+    }
+    if (!config[STORAGE_IS_CONTACT_ADMIN_ALLOWED]) {
+      this.items[STORAGE_IS_CONTACT_ADMIN_ALLOWED] = false;
+    }
+    if (!config[STORAGE_CHROMEBOOK]) {
+      this.items[STORAGE_CHROMEBOOK] = false;
+    }
+    if (!config[STORAGE_UPDATE_CHECK_DATE]) {
+      this.items[STORAGE_UPDATE_CHECK_DATE] = new Date("01 Jan 1970 00:00:00 GMT").getTime();
+    }
+  }
+
+  updateClassSessionState(message) {
+    this.sessionId = message["sessionId"] ? message["sessionId"] : null;
+    this.canRaiseHand = !!message["allowHandRaise"];
+    this.announce = null;
+    this.hasUnreadChatMessages = false;
+    this.chatMessages = message["chatMessages"] ? message["chatMessages"] : [];
+    this.canStartChat = !!message["canStartChat"];
+    this.playChatAlert = !!message["playChatAlertToStudent"];
+    this.maximizeFocusedWindow = !!message["maximizeFocused"];
+    this.maxOpenTabs = typeof parseInt(message["maxOpenTabs"]) === "number" ? parseInt(message["maxOpenTabs"]) : 0;
+    this.additionalOpenTabs = 0;
+    this.activeClassNames = message["activeClassNames"] ? message["activeClassNames"] : [];
+    this.smallScreenshotWidth = message["smallScreenshotWidth"] ? message["smallScreenshotWidth"] : 0;
+    this.smallScreenshotHeight = message["smallScreenshotHeight"] ? message["smallScreenshotHeight"] : 0;
+    this.bigScreenshotWidth = message["bigScreenshotWidth"] ? message["bigScreenshotWidth"] : 0;
+    this.bigScreenshotHeight = message["bigScreenshotHeight"] ? message["bigScreenshotHeight"] : 0;
+  }
+
+  get serverUrl() {
+    return this.items[STORAGE_SERVER_URL];
+  }
+
+  saveServerUrl(serverUrl) {
+    return this.store(STORAGE_SERVER_URL, serverUrl)
+  }
+
+  get orgBlocklist() {
+    return this.items[STORAGE_BLOCKLIST];
+  }
+
+  async saveOrgBlocklist(blocklist) {
+    await this.store(STORAGE_BLOCKLIST, blocklist);
+  }
+
+  get blockingPlanUrls() {
+    return this.items[STORAGE_BLOCKING_PLAN_URLS];
+  }
+
+  get blockingPlanName() {
+    return this.items[STORAGE_BLOCKING_PLAN_NAME];
+  }
+
+  get blockingPlanId() {
+    return this.items[STORAGE_BLOCKING_PLAN_ID];
+  }
+
+  get blockingPlanType() {
+    return this.items[STORAGE_BLOCKING_PLAN_TYPE];
+  }
+
+  async saveBlockingPlan(blockingPlanUrls, blockingPlanName, blockingPlanId, blockType) {
+    await this.store(STORAGE_BLOCKING_PLAN_URLS, blockingPlanUrls);
+    await this.store(STORAGE_BLOCKING_PLAN_NAME, blockingPlanName);
+    await this.store(STORAGE_BLOCKING_PLAN_ID, blockingPlanId);
+    await this.store(STORAGE_BLOCKING_PLAN_TYPE, blockType);
+  }
+
+  get blockedModeType() {
+    return this.items[STORAGE_BLOCKED_MODE_TYPE];
+  }
+
+  saveBlockedModeType(modeType) {
+    return this.store(STORAGE_BLOCKED_MODE_TYPE, modeType)
+  }
+
+  get blockedText() {
+    return (this.items[STORAGE_SCREEN_BLOCK_MESSAGE]) ? this.items[STORAGE_SCREEN_BLOCK_MESSAGE] : this._defaultBlockMessage;
+  }
+
+  get deviceName() {
+    return this.items[STORAGE_DEVICE_NAME];
+  }
+
+  saveDeviceName(deviceName) {
+    return this.store(STORAGE_DEVICE_NAME, deviceName)
+  }
+
+  get deviceUdid() {
+    return this.items[STORAGE_UDID];
+  }
+
+  saveDeviceUdid(deviceUdid) {
+    return this.store(STORAGE_UDID, deviceUdid)
+  }
+
+  get isChromeBook() {
+    return this.items[STORAGE_CHROMEBOOK];
+  }
+
+  saveIsChromeBook(isChromeBook) {
+    return this.store(STORAGE_CHROMEBOOK, isChromeBook);
+  }
+
+  get isChatActive() {
+    return this.chatMessages.length > 0;
+  }
+
+  get isClassSessionActive() {
+    return this.sessionId != null
+  }
+
+  get isObservationActive() {
+    return  this.sessionId != null || this.activeClassNames.length > 0;
+  }
+
+  get isContactAdminAllowed() {
+    return this.items[STORAGE_IS_CONTACT_ADMIN_ALLOWED];
+  }
+
+  get isScreenLocked() {
+    return this.items[STORAGE_BLOCKED_MODE_TYPE] === PARAM_MODE_BLOCK;
+  }
+
+  get isScreenCaptureAllowed() {
+    return this.items[STORAGE_IS_SCREEN_CAPTURE_ALLOWED];
+  }
+
+  get isSiteLocked() {
+    return !!this.items[STORAGE_WHITELIST]
+  }
+
+  get notificationInterval() {
+    return this.items[STORAGE_NOTIFICATION_INTERVAL];
+  }
+
+  get orgName() {
+    return this.items[STORAGE_ORG_NAME];
+  }
+
+  get pingCount() {
+    return this._pingCount++;
+  }
+
+  clearPingCount() {
+    this._pingCount = 0;
+  }
+
+  get updateCheckDate() {
+    return new Date(parseInt(this.items[STORAGE_UPDATE_CHECK_DATE]));
+  }
+
+  async saveUpdateCheckDate(date) {
+    return this.store(STORAGE_UPDATE_CHECK_DATE, date.getTime());
+  }
+
+  get whitelist() {
+    if (this.items[STORAGE_WHITELIST]) {
+      return this.items[STORAGE_WHITELIST];
+    }
+    return this.items[STORAGE_BLOCKING_PLAN_TYPE] === BLOCK_TYPE_ALLOW_ONLY ? this.items[STORAGE_BLOCKING_PLAN_URLS] : null;
+  }
+  async saveWhitelist(whitelist) {
+    await this.store(STORAGE_WHITELIST, whitelist)
+  }
+  async clearWhitelist() {
+    this.lockedToCourseWorkResources = false;
+    await this.store(STORAGE_WHITELIST, null);
+  }
+
+  async saveBlockedInfo(blockedMessage, modeType, notificationInterval, allowCaptureScreen, allowContactAdmin) {
+    let savedItems = {};
+
+    if (blockedMessage) {
+      savedItems[STORAGE_SCREEN_BLOCK_MESSAGE] = blockedMessage;
+      this.items[STORAGE_SCREEN_BLOCK_MESSAGE] = blockedMessage;
+    } else {
+      savedItems[STORAGE_SCREEN_BLOCK_MESSAGE] = this._defaultBlockMessage;
+      this.items[STORAGE_SCREEN_BLOCK_MESSAGE] = this._defaultBlockMessage;
+    }
+
+    if (modeType) {
+      savedItems[STORAGE_BLOCKED_MODE_TYPE] = modeType;
+      this.items[STORAGE_BLOCKED_MODE_TYPE] = modeType;
+    }
+    let diagString = "Stored screen block modeType: " + modeType + ", message: " + blockedMessage;
+
+    if (typeof allowCaptureScreen !== "undefined") {
+      savedItems[STORAGE_IS_SCREEN_CAPTURE_ALLOWED] = allowCaptureScreen;
+      this.items[STORAGE_IS_SCREEN_CAPTURE_ALLOWED] = allowCaptureScreen;
+      diagString += ", capture screen: " + allowCaptureScreen;
+    }
+    if (typeof allowContactAdmin !== "undefined") {
+      savedItems[STORAGE_IS_CONTACT_ADMIN_ALLOWED] = allowContactAdmin;
+      this.items[STORAGE_IS_CONTACT_ADMIN_ALLOWED] = allowContactAdmin;
+      diagString += ", allow contact admin: " + allowContactAdmin;
+    }
+    diagString += ", notification interval: ";
+    if (typeof allowCaptureScreen !== "undefined" && notificationInterval !== LOC_PARAM_DONT_CHANGE) {
+      savedItems[STORAGE_NOTIFICATION_INTERVAL] = notificationInterval;
+      this.items[STORAGE_NOTIFICATION_INTERVAL] = notificationInterval;
+      diagString += notificationInterval;
+    }
+    console.log(diagString);
+    return this.bulkStore(savedItems);
+  }
+
+  async saveDeviceInfo(orgName, deviceName, lostModeType, lostModeMessage, notificationInterval, allowContactAdmin,
+                 allowScreenCapture) {
+    let savedItems = {};
+    savedItems[STORAGE_ORG_NAME] = orgName;
+    this.items[STORAGE_ORG_NAME] = orgName;
+    savedItems[STORAGE_DEVICE_NAME] = deviceName;
+    this.items[STORAGE_DEVICE_NAME] = deviceName;
+    savedItems[STORAGE_BLOCKED_MODE_TYPE] = lostModeType;
+    this.items[STORAGE_BLOCKED_MODE_TYPE] = lostModeType;
+    savedItems[STORAGE_SCREEN_BLOCK_MESSAGE] = lostModeMessage;
+    this.items[STORAGE_SCREEN_BLOCK_MESSAGE] = lostModeMessage;
+    savedItems[STORAGE_NOTIFICATION_INTERVAL] = notificationInterval;
+    this.items[STORAGE_NOTIFICATION_INTERVAL] = notificationInterval;
+    savedItems[STORAGE_IS_CONTACT_ADMIN_ALLOWED] = allowContactAdmin;
+    this.items[STORAGE_IS_CONTACT_ADMIN_ALLOWED] = allowContactAdmin;
+    savedItems[STORAGE_IS_SCREEN_CAPTURE_ALLOWED] = allowScreenCapture;
+    this.items[STORAGE_IS_SCREEN_CAPTURE_ALLOWED] = allowScreenCapture;
+    return this.bulkStore(savedItems)
+  }
+
+  store(key, value) {
+    if (value) {
+      this.items[key] = value;
+      return new Promise(resolve => {
+        chrome.storage.local.set({[key]: value}, function () {
+          if (chrome.runtime.lastError) {
+            console.log("Failed to save object " + JSON.stringify(value) + " for key '" + key +
+                "'. Error is: " + chrome.runtime.lastError.message);
+          } else {
+            console.log("Stored " + JSON.stringify(value) + " for key: " + key);
+          }
+          resolve();
+        })
+      })
+    } else {
+      delete this.items[key];
+      return new Promise(resolve => {
+        chrome.storage.local.remove([key], function () {
+          if (chrome.runtime.lastError) {
+            console.log("Failed to remove key '" + key + "'. Error is: " + chrome.runtime.lastError.message);
+          } else {
+            console.log("Key '" + key + "' removed");
+          }
+          resolve();
+        })
+      })
+    }
+  }
+
+  bulkStore(object) {
+    return new Promise(resolve => {
+      chrome.storage.local.set(object, function () {
+        if (chrome.runtime.lastError) {
+          console.log("Failed to bulk save '" + JSON.stringify(object) + "'. Error is: " + chrome.runtime.lastError.message);
+        } else {
+          console.log("Items " + JSON.stringify(object) + " saved");
+        }
+        resolve();
+      })
+    })
+  }
+
+  bulkDelete(keys) {
+    return new Promise(resolve => {
+      chrome.storage.local.remove(keys, function () {
+        if (chrome.runtime.lastError) {
+          console.log("Failed to remove keys " + keys + " Error is: " + chrome.runtime.lastError.message);
+        } else {
+          console.log("Keys " + keys + " removed");
+        }
+        resolve();
+      })
+    })
+  }
+}

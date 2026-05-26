@@ -1,0 +1,88 @@
+/**
+ * Main app lifecycle start
+ */
+async function st() {
+  await clearAllAlarms();
+  if (IS_EXTENSION) {
+    setTitle();
+    iconManager = new IconManager();
+    await iconManager.noActiveClassIcon();
+    config = await getConfig();
+  } else {
+    config = new Config({});
+  }
+  router = new Router(config.serverUrl);
+  config.userEmail = await getEmail();
+  if (IS_KIOSK) {
+    requestBlockScreen(config.blockedText, config.blockedModeType, config.notificationInterval,
+        config.isScreenCaptureAllowed, config.isContactAdminAllowed);
+    updateVersion();
+  }
+  if (IS_EXTENSION) {
+    const storedUrls = await getStoredUrls();
+    console.log("INIT URL STORAGE WITH URLS=" + JSON.stringify(storedUrls));
+    urlStorage = new UrlStorage(storedUrls);
+  }
+  await obtainDirectoryDeviceId();
+  await loginToServer();
+}
+
+async function obtainDirectoryDeviceId() {
+    const directoryDeviceId = await getDirectoryDeviceId();
+    if (directoryDeviceId) {
+      config.directoryDeviceId = directoryDeviceId;
+      await config.saveIsChromeBook(true);
+    } else if (typeof substituteDeviceId === "function") {
+      substituteDeviceId();
+    }
+}
+
+async function createOffscreen() {
+  try {
+    if (createOffscreen.creating) {
+      await createOffscreen.creating;
+    } else {
+      createOffscreen.creating = chrome.offscreen.createDocument({
+        url: "o.html",
+        reasons: ["WORKERS"],
+        justification: "keep connection to server",
+      });
+      await createOffscreen.creating;
+    }
+    console.log("Offscreen document created");
+    createOffscreen.creating = null;
+  } catch(e) {
+    console.log("Failed to create offscreen document: " + e);
+  }
+}
+createOffscreen.creating = null;
+
+const stp = function () {
+  console.log('Stopping the app');
+  chrome.alarms.clearAll();
+};
+
+async function startApp() {
+  if (HAS_UNSUPPORTED_VERSION) {
+    return;
+  }
+  if (startApp.starting) {
+    await startApp.starting;
+  } else {
+    startApp.starting = createOffscreen().then(st);
+    await startApp.starting;
+  }
+  startApp.starting = null;
+}
+startApp.starting = null;
+
+chrome.runtime.onSuspend.addListener(function() {
+  console.log('App suspended');
+});
+
+self.onmessage = e => {
+  if (!config) {
+    console.log("restarting app");
+    st();
+  }
+};

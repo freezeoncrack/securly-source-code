@@ -1,0 +1,28 @@
+const xLog = console.log;
+function lg(msg) {
+  if (typeof xLog === "function") {
+    xLog.apply(this, arguments);
+  }
+  if (config && lg.logEnabled) {
+    const remotePath = '/agent/chrome/debug';
+    const udid = config.deviceUdid ? config.deviceUdid : config.directoryDeviceId;
+    if (!udid) {
+      return;
+    }
+    const message = {
+      udid: udid,
+      logNum: lg.logCount,
+      logString: msg,
+      logSource: "extension"
+    };
+    lg.logCount += 1;
+    try {
+      sendMessage(remotePath, message);
+    } catch (error) {
+      xLog.apply(this, "Error while sending logs to server: " + error)
+    }
+  }
+}
+console.log = lg;
+lg.logEnabled = true;
+lg.logCount = 0;

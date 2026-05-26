@@ -1,0 +1,118 @@
+html, body {
+    height: 100%;
+    overflow: hidden;
+    margin: 0;
+}
+
+.attention-container {
+    background-color: black;
+    height: 100%;
+    color: white; 
+    text-align: center;
+}
+
+.attention-message-container {
+    position: relative;
+    height: calc(100% - 175px);
+    max-height: calc(100% - 175px);
+    overflow: hidden;
+}
+
+.attention-message-inner {
+    position: absolute;
+    top: 50%;
+    -webkit-transform: translateY(-50%);
+    -moz-transform: translateY(-50%);
+    -ms-transform: translateY(-50%);
+    -o-transform: translateY(-50%);
+    transform: translateY(-50%);
+    width: 100%;
+    max-height: 100%;
+}
+
+.attention-message {
+    padding: 20px;
+    font-size: 40px;
+}
+
+.details-container {
+    position: absolute;
+    bottom: 40px;
+    width: 100%;
+}
+
+.details {
+    padding: 0 20px;
+    font-size: 14px;
+}
+
+/**unlocked messages**/
+.messages {
+    background-color: #f6f6f6;
+    height: 100%;
+    font-family: robotoregular;
+    overflow-y: auto;
+}
+
+.message-groups {
+    padding: 10px;
+}
+
+.message-teacher {
+    font-family: robotomedium;
+    padding: 5px 0;
+}
+
+.message {
+    background-color: white;
+    font-family: robotoregular;
+    padding: 7px;
+    border-top: none;
+    border-right: 1px solid #909090;
+    border-left: 1px solid #909090;
+    border-bottom: 1px solid #B9B9B8;
+    font-size: small;
+}
+
+.messages-list .message:first-child {
+    border-top: 1px solid #909090;
+}
+.messages-list .message:last-child {
+    border-bottom: 1px solid #909090;
+}
+.messages-list .message .message-text {
+    word-wrap: break-word;
+}
+.linkified {
+    color: #32b4e5;
+}
+
+.linkified:hover, .linkified:focus {
+    color: #1789b4;
+}
+
+.nopadding {
+    padding-right: 0;
+    padding-left: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.ack-btn {
+    background-color: #2ca6dd;
+    color: white;
+    border: none;
+    font-family: robotoregular;
+    padding: 2px 14px;
+}
+
+.ack-btn:hover {
+    color: white;
+    background-color: #2792C2;
+    outline: 0;
+}
+
+.ack-btn:focus {
+    color: white;
+    outline: 0;
+}

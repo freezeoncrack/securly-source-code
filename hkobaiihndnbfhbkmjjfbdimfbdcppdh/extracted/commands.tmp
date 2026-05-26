@@ -1,0 +1,288 @@
+// Outgoing actions initiated by extension/kiosk
+
+async function sendPing() {
+  try {
+    await sendMessage("/agent/chrome/debug", {
+      udid: config.deviceUdid,
+      logString: "Ping " + config.pingCount,
+      logNum: lg.logCount,
+      logSource: "extension"
+    });
+    lg.logCount += 1;
+  } catch (error) {
+    console.log("Cannot send ping: " + error);
+  }
+}
+
+async function sendLoggedUrls() {
+  if (!urlStorage || !urlStorage.hasUrls()) {
+    return;
+  }
+  if (sendLoggedUrls.isSending) {
+    return;
+  }
+  sendLoggedUrls.isSending = true;
+  if (config.isClassSessionActive) {
+    await logCurrentTabUrl()
+  }
+  try {
+    await sendMessage("/agent/chrome/url", {
+      udid: config.deviceUdid,
+      urls: urlStorage.getUrls(),
+      timestamp: Date.now()
+    });
+    console.log("Urls sent successfully");
+    urlStorage.purge();
+  } catch (error) {
+    console.log("Error while sending urls: " + error);
+  } finally {
+    sendLoggedUrls.isSending = false;
+  }
+}
+
+// Name used in build script for test obfuscation of extension, change there in case of renaming as well
+async function loginToServer(showErrorPage) {
+  console.log("Initiate login at " + new Date());
+  await clearAllAlarms();
+  router.cleanQueue();
+  try {
+    await processResponse(await getOrgUrlIfNeeded());
+    await processResponse(await sendAuthenticateIfNeeded());
+    if (!config.isChromeBook) {
+      const winAgentIsPresent = await hasWindowsAgent();
+      if (winAgentIsPresent) {
+        console.log("Windows agent is present. Terminating login");
+        return;
+      }
+    }
+    const success = await sendLogin();
+    if (!success) {
+      console.log("Failed to login. Repeat in 1 minute");
+      chrome.alarms.create(ALARM_REPEAT_LOGIN, {periodInMinutes: 1});
+      return;
+    }
+    if (IS_EXTENSION) {
+      chrome.action.onClicked.removeListener(loginToServer);
+      chrome.runtime.onMessage.removeListener(pageMessageListener);
+    }
+    if (typeof lg !== "undefined") {
+      lg.logCount = 0;
+    }
+    config.clearPingCount();
+    config.loginErrorReason = null;
+    pollServer();
+  } catch (error) {
+    if (hasText(error, ERROR_DEVICE_NOT_FOUND)) {
+      console.log("Failed to authenticate: " + error);
+      console.log("Logout and login again to connect");
+      if (showErrorPage && config.loginErrorReason) {
+        await showDisconnectedScreen();
+      }
+    } else if (hasText(error, ERROR_UPGRADE_REQUIRED)) {
+      console.log("Extension upgrade required");
+      await checkForUpgrade();
+    } else {
+      console.log("Failed to login: " + error);
+      chrome.alarms.create(ALARM_REPEAT_LOGIN, {periodInMinutes: 1});
+    }
+  }
+}
+
+function loginFromButton() {
+  loginToServer(true);
+}
+
+async function showDisconnectedScreen() {
+  chrome.runtime.onMessage.addListener(pageMessageListener);
+  const disconnectedUrl = chrome.runtime.getURL("disconnected.html");
+  try {
+    await openNewTab({url: disconnectedUrl})
+  } catch (error) {
+    console.log("Cannot open not found page due to error: " + error);
+  }
+}
+
+async function getOrgUrlIfNeeded() {
+  const requestServerUrl = config.serverUrl === SERVER;
+  const deviceId = config.directoryDeviceId;
+  console.log("Request server url=" + requestServerUrl + " config.serverUrl=" + config.serverUrl + " udid=" + deviceId);
+  if (!requestServerUrl) {
+    return Promise.resolve();
+  }
+  const message = {
+    command: COMMAND_GET_ORG_URL,
+    udid: deviceId,
+    kiosk: IS_KIOSK,
+    userEmail: !IS_KIOSK ? config.userEmail : "kiosk",
+    version: VERSION,
+    userAgent: navigator.userAgent,
+  };
+  console.log("Get org url message=" + JSON.stringify(message));
+  return router.send(message, POLLING_PATH);
+}
+
+async function sendAuthenticateIfNeeded() {
+  if (config.deviceUdid) {
+    return Promise.resolve();
+  }
+  const message = {
+    command: COMMAND_AUTHENTICATE,
+    userEmail: config.userEmail,
+    kiosk: IS_KIOSK,
+    version: VERSION,
+    userAgent: navigator.userAgent
+  };
+  if (config.directoryDeviceId) {
+    message["udid"] = config.directoryDeviceId;
+  } else {
+    message["byod"] = true;
+  }
+  console.log("Send AUTHENTICATE=" + JSON.stringify(message));
+  return router.send(message, POLLING_PATH);
+}
+
+async function sendLogin() {
+  await router.send({
+    response: COMMAND_LOGIN,
+    kiosk: IS_KIOSK,
+    userEmail: !IS_KIOSK ? config.userEmail : "kiosk",
+    userAgent: navigator.userAgent,
+    version: VERSION,
+    manifest: MANIFEST_VERSION,
+    id: chrome.runtime.id,
+    udid: config.deviceUdid,
+    command: "ack"
+  }, FIRE_PATH);
+  return true;
+}
+
+// Do not delete. Called from kiosk browser script to send message
+function sm(textMessage) {
+  const message = {response: COMMAND_SEND_MESSAGE, text: textMessage};
+  router.sendCommand(message);
+}
+
+async function sendScreenshot(dataUri, screenshotUrl, size, tabUrl, tabTitle) {
+  let blob;
+  switch (size) {
+    case SCREENSHOT_SIZE.SMALL:
+      blob = await resizeImage(dataUri, config.smallScreenshotWidth, config.smallScreenshotHeight);
+      break;
+    case SCREENSHOT_SIZE.BIG:
+      blob = await resizeImage(dataUri, config.bigScreenshotWidth, config.bigScreenshotHeight);
+      break;
+    default:
+      blob = await resizeImage(dataUri, 0, 0);
+  }
+  let serverUrl = buildServerUrlForScreenshot(screenshotUrl, size !== SCREENSHOT_SIZE.SMALL);
+  if (typeof tabUrl !== "undefined") {
+    serverUrl += "&tabUrl=" + encodeURIComponent(tabUrl);
+  }
+  if (typeof tabTitle !== "undefined") {
+    serverUrl += "&tabTitle=" + encodeURIComponent(tabTitle);
+  }
+  await performSendScreenshotRequest(serverUrl, blob);
+}
+
+async function performSendScreenshotRequest(serverUrl, blob) {
+  try {
+    console.log("Screenshot send complete to url=" + serverUrl);
+    const response = await fetch(createRequest(serverUrl, blob));
+    return response.status !== 204;
+  } catch (error) {
+    console.log("Failed to upload screenshot to url=" + serverUrl);
+    return true;
+  }
+}
+
+function buildServerUrlForScreenshot(urlPath, isBig) {
+  let serverUrl = config.serverUrl + urlPath;
+  if (serverUrl.indexOf("uid=") !== -1) {
+    serverUrl += "&udid=" + config.deviceUdid;
+  } else {
+    serverUrl += "?udid=" + config.deviceUdid;
+  }
+  if (config.userEmail) {
+    serverUrl += "&userEmail=" + encodeURIComponent(config.userEmail);
+  }
+  serverUrl += isBig ? "&big=true" : "";
+  return serverUrl;
+}
+
+async function resizeImage(dataUri, maxWidth, maxHeight) {
+  let response = await fetch(dataUri);
+  let blob = await response.blob();
+  const imageBitmap = await createImageBitmap(blob);
+  try {
+    const width = imageBitmap.width;
+    const height = imageBitmap.height;
+    let scaleFactor = 1;
+    if (maxWidth !== 0 || maxHeight !== 0) {
+      const widthFactor = Math.min(maxWidth/width, 1);
+      const heightFactor = Math.min(maxHeight/height,1);
+      if (widthFactor !== 0 && heightFactor !== 0) {
+        scaleFactor = widthFactor < heightFactor ? widthFactor : heightFactor;
+      } else {
+        scaleFactor = widthFactor !== 0 ? widthFactor : heightFactor;
+      }
+    }
+    if (scaleFactor !== 1) {
+      return await steppedResize(imageBitmap, scaleFactor);
+    }
+    console.log("Image will not be resized");
+    return await encodeWebp(imageBitmap);
+  } finally {
+    imageBitmap.close();
+  }
+}
+
+async function encodeWebp(source, options = {}) {
+  const {
+    width = source.width,
+    height = source.height,
+    sourceWidth = source.width,
+    sourceHeight = source.height,
+  } = options;
+  const canvas = new OffscreenCanvas(width, height);
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(source, 0, 0, sourceWidth, sourceHeight, 0, 0, width, height);
+  return canvas.convertToBlob({ type: "image/webp", quality: 0.70 });
+}
+
+// Consecutive resize of an image results in smoother picture
+async function steppedResize(imageBitmap, scaleFactor) {
+  const nOfsteps = Math.ceil(Math.log(1 / scaleFactor) / Math.log(2));
+  let tCanvas = new OffscreenCanvas(imageBitmap.width, imageBitmap.height);
+  let tCtx = tCanvas.getContext("2d");
+  tCtx.imageSmoothingEnabled = true;
+  tCtx.imageSmoothingQuality = "high";
+  let stepWidth = imageBitmap.width;
+  let stepHeight = imageBitmap.height;
+  for (let i = 1.0; i <= nOfsteps; i++) {
+    const currentScaleFactor = scaleFactor + (1 - scaleFactor) / (i * 2.0);
+    const scaledWidth = Math.floor(imageBitmap.width * currentScaleFactor);
+    const scaledHeight = Math.floor(imageBitmap.height * currentScaleFactor);
+    if (i === 1.0) {
+      tCanvas.width = scaledWidth;
+      tCanvas.height = scaledHeight;
+      tCtx.drawImage(imageBitmap, 0, 0, scaledWidth, scaledHeight);
+    } else {
+      tCtx.drawImage(tCanvas, 0, 0, stepWidth, stepHeight, 0, 0, scaledWidth, scaledHeight);
+    }
+    stepWidth = scaledWidth;
+    stepHeight = scaledHeight;
+  }
+  return encodeWebp(tCanvas, {
+    width: Math.floor(imageBitmap.width * scaleFactor),
+    height: Math.floor(imageBitmap.height * scaleFactor),
+    sourceWidth: stepWidth,
+    sourceHeight: stepHeight,
+  });
+}
+
+function hasText(error, text) {
+  const errorText = error instanceof Error ? error.message : error;
+  return typeof errorText === "string" && errorText.toLowerCase().includes(text);
+}

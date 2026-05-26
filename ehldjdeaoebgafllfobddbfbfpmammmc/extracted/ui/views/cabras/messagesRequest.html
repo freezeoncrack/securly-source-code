@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Attention</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <script type="module" type="text/javascript" src="../../../js/lib/jquery-2.1.1.min.js"></script>
+    <script type="module" src="../../../js/lib/linkify.min.js"></script>
+    <script type="module" src="../../../js/lib/linkify-string.min.js"></script>
+    <script type="module" src="/ui/js/mainMessages.js"></script>
+    <link rel="stylesheet" href="/style/font-awesome/css/font-awesome.min.css">
+    <link rel="stylesheet" type="text/css" href="/style/fonts.css">
+    <link rel="stylesheet" href="/style/bootstrap/css/bootstrap.css">
+    <link rel="stylesheet" href="/style/attention.css" />
+</head>
+    <body>
+        <div id="messages" class="messages">
+            <div id="message-groups" class="message-groups" data-bind="foreach: groups">
+                <div class="message-group">
+                    <div class="message-teacher">Your teacher<span data-bind="if: teacher">, <span data-bind="text: teacher"></span>,</span> says:</div>
+                    <div class="messages-list" data-bind="foreach: messages">
+                        <div class="message">
+                            <div class="container">
+                                <div class="row">
+                                    <div class="col-xs-9 nopadding message-text" data-bind="html: message"></div>
+                                    <div class="col-xs-3 nopadding">
+                                        <button data-bind="click:$parent.ack" class="btn btn-xs ack-btn pull-right">Got it</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>

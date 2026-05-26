@@ -1,0 +1,62 @@
+class Url {
+  constructor(url, tabTitle, isBlocked =  false) {
+    const urlObj = new URL(url);
+    this.domain = urlObj.hostname;
+    this.path = urlObj.pathname.slice(0, 1000);
+    this.tabTitle = typeof tabTitle === "string" ? tabTitle.trim().slice(0, 1000) : null;
+    this.isBlocked = isBlocked;
+    this.timestamp = Date.now();
+  }
+}
+
+class UrlStorage {
+
+  constructor(urls) {
+    this.urls = Array.isArray(urls) ? urls : [];
+    this.lastVisitedUrl = null;
+  }
+
+  saveUrl(url) {
+    if (!this.isLast(url)) {
+      this.lastVisitedUrl = url;
+        this.urls.push(url);
+    }
+    chrome.storage.local.set({[STORAGE_URLS]: this.urls}, () => {
+      if (chrome.runtime.lastError) {
+        console.log("Failed to save urls to local storage" + ". Error is: " + chrome.runtime.lastError.message);
+      }
+    })
+  }
+
+  isLast(url) {
+    return (this.lastVisitedUrl instanceof Url) &&
+        this.lastVisitedUrl.domain === url.domain &&
+        this.lastVisitedUrl.path === url.path;
+  }
+
+  hasUrls() {
+    return this.urls.length > 0;
+  }
+
+  getUrls() {
+    return this.urls;
+  }
+
+  purge() {
+    this.urls = [];
+    this.lastVisitedUrl = null;
+    chrome.storage.local.remove(STORAGE_URLS, () => {
+      if (chrome.runtime.lastError) {
+        console.log("Failed to clear urls from local storage: " + chrome.runtime.lastError.message);
+      } else {
+        getStoredUrls().then(urls => {
+          if (typeof urls != "undefined") {
+            console.log("Failed to clear urls from local storage");
+          } else {
+            console.log("Urls cleared from local storage");
+          }
+        });
+      }
+    });
+  }
+}

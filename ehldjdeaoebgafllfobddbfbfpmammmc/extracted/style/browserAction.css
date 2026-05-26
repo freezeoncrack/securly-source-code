@@ -1,0 +1,76 @@
+body{
+    min-height:200px;
+    min-width:200px;
+}
+.popover{
+    background-color:rgb(244,244,244);
+    min-width:250px;
+    width:365px;
+    border:1px solid rgb(200,200,200);
+}
+
+.status.popover{
+
+}
+
+.status.popover .header{
+    border-bottom:2px solid rgb(200,200,200);
+    padding-top:10px;
+    padding-bottom:10px;
+}
+
+.status.popover .header span{
+    height:30px;
+    font-size:14px;
+}
+
+.status.popover .body{
+    height:121px;
+}
+
+.status.popover .body .wrapper{
+    height:100%;
+}
+
+.status.popover .body div.cell{
+    min-height:121px;
+    min-width:121px;
+    float:left;
+    text-align:center;
+    position:relative;
+}
+
+.status.popover .body div .mask{
+    position:absolute;
+    left:0;
+    top:-1px;
+    right:0;
+    bottom:0;
+    z-index:2;
+    color:white;
+    background-color: #99cc00;
+}
+
+.status.popover .body div .mask.visible{
+    display:block;
+}
+
+.status.popover .body .cell{
+    border-right:1px solid rgb(200,200,200);
+}
+
+.status.popover .body .cell:last-child{
+    border-right: none;
+}
+
+
+.status img{
+    margin-top:15px;
+    border-radius:50%
+}
+
+.status p{
+    font-size:12px;
+    line-height:12px;
+    margin-top: 5px;
+}

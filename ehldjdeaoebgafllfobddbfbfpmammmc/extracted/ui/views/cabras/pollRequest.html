@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<HTML>
+<head>
+    <title>Select an answer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script type="module" type="text/javascript" src="../../../js/lib/jquery-2.1.1.min.js"></script>
+<script type="module" src="/ui/js/mainPoll.js"></script>
+    
+<link rel="stylesheet" href="/style/poll.css" />
+<link rel="stylesheet" href="/style/font-awesome/css/font-awesome.min.css">
+</head>
+    <body>
+        <div style="display:none" id="poll" data-bind="visible:loaded()">
+            <div class="question">
+                <p data-bind="text:activePoll().question()"></p>
+            </div>
+            <div data-bind="foreach: activePoll().answers()">
+                <div class="answer" data-bind="css: {selected: isSelected()}, click:selectMe">
+                    <p class="option" data-bind="text:answer, class: lower_answer"></p>
+                    <p class="text" data-bind="text:custom_answer"></p>
+                </div>
+            </div>
+            <div class="send">
+                <div class="mask" data-bind="visible:  showMask">
+                    <span>Answer Sent!</span>
+                    <span class="check"><i class="fa fa-check"></i></span>
+                </div>
+                <button data-bind="click:submitAnswer" class="submittable">Send My Answer</button>
+            </div>
+        </div>
+    </body>
+</HTML>
+
+
+

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<video id="video"></video>
+<script>
+    chrome = {
+        runtime: {
+            onMessage: {
+                addListener: function () {}
+            },
+            onRestartRequired: {
+                addListener: function () {}
+            },
+            onSuspend: {
+                addListener: function () {}
+            },
+            onSuspendCanceled: {
+                addListener: function () {}
+            },
+            onUpdateAvailable: {
+                addListener: function () {}
+            },
+            getPlatformInfo : function (){}
+        },
+        action:{
+            disable: function () {},
+            setIcon: function () {}
+        }
+
+    }
+</script>
+<script type="module" src="./worker.js"></script>
+</body>
+</html>

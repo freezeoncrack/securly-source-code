@@ -1,0 +1,22 @@
+{
+  "name": "dyknowChromebook",
+  "version": "0.0.0",
+  "homepage": "https://github.com/DyKnow/dyknowChromebook",
+  "authors": [
+    "Alex Billingsley <abillingsley@dyknow.com>"
+  ],
+  "moduleType": [
+    "amd"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "js/bower_lib/",
+    "test",
+    "tests"
+  ],
+  "devDependencies": {
+  }
+}

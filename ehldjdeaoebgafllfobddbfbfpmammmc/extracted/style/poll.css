@@ -1,0 +1,125 @@
+body{
+    margin:0px;
+    padding-bottom:40px;
+}
+#poll {
+    width:100%;
+}
+
+#poll div {
+    border-bottom:1px solid rgb(220,220,220);
+}
+#poll .header h2{
+    color: #2ca6dd;
+    margin-top:10px;
+    margin-bottom:5px;
+}
+
+#poll .header p{
+    color: #404041;
+    margin-top:5px;
+    margin-bottom:5px;
+}
+
+
+#poll .question {
+    padding:20px 0px 20px 20px;
+
+}
+#poll .question p{
+    font-weight:bold;
+    padding:0px;
+    margin:0;
+}
+
+#poll .answer{
+    padding:15px;
+}
+
+#poll .option {
+    border-radius:50%;
+    padding: 5px;
+    margin-top:7px;
+    padding-left: 9px;
+    padding-right: 9px;
+    color:white;
+    float:left;
+}
+
+#poll .answer .text{
+    margin-left:35px;
+}
+
+#poll .answer.selected{
+    background-color:rgb(230,230,230);
+}
+
+#poll .option.a, 
+#poll .option.y /*false*/,
+#poll .option.t /*true*/ {
+    background-color: #2EA6DD;
+}
+
+#poll .option.b,
+#poll .option.n /*no*/,
+#poll .option.f /*false*/ {
+    background-color: #FFD350;
+}
+#poll .option.c{
+    background-color: #3FC0BF;
+}
+#poll .option.d{
+    background-color: #5865BC;
+}
+#poll .option.e{
+    background-color: #99CC00;
+}
+#poll .option.f{
+    background-color: #FF4444;
+    border-bottom:none;
+}
+
+#poll .send{
+    position:fixed;
+    bottom:0;
+    left:0;
+    right:0;
+}
+
+#poll .send .mask{
+    position:absolute;
+    top:0;
+    bottom:0;
+    left:0;
+    right:0;
+    background-color:#99cc00;
+    color:white;
+    font-size:14px;
+    border-bottom:none;
+}
+
+#poll .send .mask span{
+    float:left;
+    padding-left:15px
+}
+#poll .send .mask .check{
+    float:right;
+    padding-right:15px;
+    color:white;
+}
+#poll .send span{
+    padding-top:12px
+}
+
+#poll .send button{
+    height:40px;
+    width:100%;
+    border:none;
+    color:white;
+    font-size:14px;
+    background-color:rgb(230,230,230);
+}
+
+#poll .send button.submittable{
+    background-color:#2ca6dd;
+}

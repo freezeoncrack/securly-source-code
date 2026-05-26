@@ -1,0 +1,257 @@
+/**
+ * Created by Stan on 01/03/17
+ * Main server interaction functions
+ */
+"use strict";
+
+class Router {
+  constructor(url) {
+    this.url = url;
+    console.log("Router initialized for " + this.url);
+    this.queue = [];
+    this.isSending = false;
+  }
+
+  static getAck(message) {
+    if (message) {
+      if (message["requestType"] === REQUEST_DEVICE_NOT_FOUND) {
+        throw new Error(ERROR_DEVICE_NOT_FOUND);
+      }
+      return {seq: message["seq"], response: message["requestType"]};
+    } else {
+      return {};
+    }
+  }
+
+  updateUrl(newUrl) {
+    this.url = newUrl;
+    console.log("Router url updated=" + this.url);
+  }
+
+  async sendCommand(message) {
+    Object.assign(message, {version: VERSION, udid: config.deviceUdid, command: "ack"});
+    this.queue.push(message);
+    return await this.processQueue();
+  }
+
+  cleanSent() {
+    this.queue = this.queue.filter(command => !command["sent"]);
+  }
+
+  cleanQueue() {
+    this.queue.splice(0, this.queue.length);
+  }
+
+  async processQueue() {
+    let result = false;
+    if (this.isSending) {
+      return true;
+    }
+    this.cleanSent();
+    this.isSending = true;
+    try {
+      for (const command of this.queue) {
+        console.log("Sending command=" + JSON.stringify(command));
+        await this.send(command, FIRE_PATH);
+        console.info("Command " + JSON.stringify(command) + " sent successfully");
+        command["sent"] = true;
+      }
+      result = true;
+    } catch (error) {
+      console.log("Failed to send command. Error=" + error);
+      result = false;
+    } finally {
+      this.isSending = false;
+      this.cleanSent();
+    }
+    return result;
+  }
+
+  async readCommands(messageAck) {
+    Object.assign(messageAck, {version: VERSION, udid: config.deviceUdid, command: "ack"})
+    if (this.queue.length > 0) {
+      await this.processQueue();
+    }
+    console.log("Sending ack=" + JSON.stringify(messageAck));
+    return await this.send(messageAck, POLLING_PATH);
+  }
+
+  async send(message, path) {
+    const response = await fetch(this.url + path, {
+      method: "POST",
+      headers: {
+        [HEADER_REG_CODE]: message["udid"],
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      signal: AbortSignal.timeout(HTTP_REQUEST_TIMEOUT),
+      body: JSON.stringify(message)
+    });
+    if (response) {
+      if (response.status === 200) {
+        let respText = await response.text();
+        if (respText) {
+          try {
+            return JSON.parse(respText);
+          } catch (error) {
+            if (respText.length > 200) {
+              respText = respText.substring(0, 200) + "...";
+            }
+            throw new Error("FETCH: Incorrect response=" + respText + ". Error=" + error);
+          }
+        }
+      } else if (response.status === HTTP_PRECONDITION_FAILED) {
+        throw new Error(ERROR_UPGRADE_REQUIRED);
+      } else {
+        throw new Error("FETCH: Server responded with http status=" + response.status);
+      }
+    }
+  }
+}
+
+async function processCommand(command) {
+  const action = actionFunctions[command["requestType"]];
+  if (typeof action !== "undefined") {
+    return action(command)
+  } else {
+    console.log("Got unknown message: " + command["requestType"]);
+  }
+}
+
+async function processResponse(response) {
+  if (!response) {
+    return Promise.resolve();
+  }
+  console.log("Process server commands: " + JSON.stringify(response));
+  let commands = response["commands"];
+  if (commands && commands.length > 0) {
+    return commands.reduce((previous, current) => previous.then(processCommand(current)), Promise.resolve());
+  } else {
+    return processCommand(response);
+  }
+}
+
+async function getAcks(response) {
+  let commands = response["commands"];
+  if (commands && commands.length > 0) {
+    return { responses: commands.map(command => Router.getAck(command)) };
+  } else if (response["requestType"]) {
+    return { responses: [Router.getAck(response)] };
+  }
+  return { responses: [] };
+}
+
+
+async function pollServer() {
+  console.log("Long polling started");
+  if (IS_EXTENSION) {
+    chrome.alarms.create(ALARM_SEND_URLS, {periodInMinutes: 1});
+  }
+  const MAX_ERRORS = 3;
+  let errorCounter = 0;
+  let message = null;
+  let poll = true;
+  while (poll) {
+    try {
+      if (!message) {
+        message = Router.getAck();
+      }
+      const response = await router.readCommands(message);
+      if (response) {
+        message = await getAcks(response)
+            .catch(() => {
+              poll = false;
+            });
+        processResponse(response)
+            .catch(error => {
+              if (hasText(error, ERROR_DEVICE_NOT_FOUND)) {
+                poll = false;
+              } else {
+                console.log("Failed to process action for one of responses:" + response + " error: " + error)
+              }
+            });
+      } else {
+        message = null;
+      }
+    } catch (error) {
+      if (!config.isLoggedIn) {
+        chrome.alarms.create(ALARM_REPEAT_LOGIN, {delayInMinutes: 1});
+        console.log("Not logged in. Repeat login in 1 minute. Error: " + error);
+        poll = false;
+      } else if (hasText(error, ERROR_UPGRADE_REQUIRED)) {
+        poll = false;
+        await checkForUpgrade();
+      } else {
+        errorCounter += 1;
+        if (errorCounter >= MAX_ERRORS) {
+          chrome.alarms.create(ALARM_RESTART_POLLING, {delayInMinutes: 1});
+          console.log("Schedule server polling restart due to error=" + error);
+          poll = false;
+        }
+        console.log("Error #" + errorCounter + " while polling=" + error);
+      }
+    }
+  }
+  console.log("Long polling stopped");
+  chrome.alarms.clear(ALARM_SEND_URLS);
+}
+
+//-----
+
+chrome.alarms.onAlarm.addListener(alarmProcessing);
+
+function alarmProcessing(alarm) {
+  console.log("Fired alarm " + alarm.name);
+  switch (alarm.name) {
+    case ALARM_SHOW_WARNING:
+      if (!config.isScreenLocked) {
+        requestBlockScreen(config.blockedText, config.blockedModeType, LOC_PARAM_DONT_CHANGE,
+            config.isScreenCaptureAllowed, config.isContactAdminAllowed);
+      }
+      break;
+    case ALARM_REPEAT_LOGIN:
+      loginToServer();
+      break;
+    case ALARM_SEND_PING:
+      if (typeof lg !== "undefined") {
+        sendPing();
+      }
+      break;
+    case ALARM_SEND_URLS:
+      sendLoggedUrls();
+      break;
+    case ALARM_RESTART_APP:
+      chrome.runtime.reload();
+      break;
+    case ALARM_RESTART_POLLING:
+      chrome.alarms.clear(ALARM_RESTART_POLLING);
+      pollServer();
+      break;
+    default:
+      console.log("Cannot process alarm");
+  }
+}
+
+async function sendMessage(remotePath, message) {
+  if (config) {
+    return fetch(createRequest(config.serverUrl + remotePath, JSON.stringify(message)));
+  } else {
+    throw new Error("No config");
+  }
+}
+
+function createRequest(url, data) {
+  const contentType = data instanceof Blob && data.type
+    ? data.type
+    : "application/json; charset=UTF-8";
+  const request = new Request(url, {
+    method: "POST",
+    headers: {
+      [HEADER_REG_CODE]: config.deviceUdid,
+      "Content-Type": contentType
+    },
+    signal: AbortSignal.timeout(HTTP_REQUEST_TIMEOUT),
+    body: data
+  });
+  request.priority = "high";
+  return request
+}
